@@ -1,19 +1,33 @@
 package prometheus
 
 import (
+	"context"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"gorm.io/gorm"
 )
 
-type Option struct {
-	HttpServer      bool   // if true, create http server to expose metrics
-	HttpServerPort  uint32 // http server port
+const (
+	defaultRefreshInterval = 15   //the prometheus default pull metrics every 15 seconds
+	defaultHTTPServerPort  = 9100 // prometheus default pull port
+)
+
+type Prometheus struct {
+	*gorm.DB
+	*DBStats
+	*Config
+	sync.Once
+}
+
+type Config struct {
+	StartServer     bool   // if true, create http server to expose metrics
+	HTTPServerPort  uint32 // http server port
 	RefreshInterval uint32 // refresh metrics interval.
 }
 
@@ -32,26 +46,26 @@ type DBStats struct {
 	MaxLifetimeClosed prometheus.Gauge // The total number of connections closed due to SetConnMaxLifetime.
 }
 
-const (
-	defaultRefreshInterval = 15   //the prometheus default pull metrics every 15 seconds
-	DefaultHttpServerPort  = 9100 // prometheus default pull port
-)
-
-var (
-	stats  *DBStats
-	option Option
-	db     *gorm.DB
-	once   sync.Once
-)
-
-func New(o Option) {
-	option = o
-
-	if option.HttpServer == true {
-		httpServer()
+func New(config Config) *Prometheus {
+	if config.RefreshInterval == 0 {
+		config.RefreshInterval = defaultRefreshInterval
 	}
 
-	stats = &DBStats{
+	if config.HTTPServerPort == 0 {
+		config.HTTPServerPort = defaultHTTPServerPort
+	}
+
+	return &Prometheus{Config: &config}
+}
+
+func (p *Prometheus) Name() string {
+	return "gorm:prometheus"
+}
+
+func (p *Prometheus) Initialize(db *gorm.DB) { //can be called repeatedly
+	p.DB = db
+
+	p.DBStats = &DBStats{
 		MaxOpenConnections: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "max_open_connections",
 			Help: "Maximum number of open connections to the database.",
@@ -86,64 +100,47 @@ func New(o Option) {
 		}),
 	}
 
-	dbStatsValue := reflect.ValueOf(stats)
+	dbStatsValue := reflect.ValueOf(p.DBStats)
 
 	for i := 0; i < dbStatsValue.NumField(); i++ {
 		_ = prometheus.Register(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
 	}
-}
 
-func (dbStats *DBStats) Name() string {
-	return "gorm prometheus plugin"
-}
+	p.Once.Do(func() {
+		if p.Config.StartServer {
+			go p.startServer()
+		}
 
-func (dbStats *DBStats) Initialize(database *gorm.DB) { //can be called repeatedly
-	db = database
-
-	once.Do(func() {
 		go func() {
-			var interval uint32
-			if option.RefreshInterval != 0 {
-				interval = option.RefreshInterval
-			} else {
-				interval = defaultRefreshInterval
-			}
-
-			ticker := time.NewTicker(time.Duration(interval) * time.Second)
-			for {
-				<-ticker.C
-				refresh()
+			for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
+				p.refresh()
 			}
 		}()
 	})
 }
 
-func refresh() {
-	dbStats := db.DB().Stats()
+func (p *Prometheus) refresh() {
+	if db, err := p.DB.DB(); err == nil {
+		dbStats := db.Stats()
 
-	stats.MaxOpenConnections.Set(float64(dbStats.MaxOpenConnections))
-	stats.OpenConnections.Set(float64(dbStats.OpenConnections))
-	stats.InUse.Set(float64(dbStats.InUse))
-	stats.Idle.Set(float64(dbStats.Idle))
-	stats.WaitCount.Set(float64(dbStats.WaitCount))
-	stats.WaitDuration.Set(float64(dbStats.WaitDuration))
-	stats.MaxIdleClosed.Set(float64(dbStats.MaxIdleClosed))
-	stats.MaxLifetimeClosed.Set(float64(dbStats.MaxLifetimeClosed))
+		p.DBStats.MaxOpenConnections.Set(float64(dbStats.MaxOpenConnections))
+		p.DBStats.OpenConnections.Set(float64(dbStats.OpenConnections))
+		p.DBStats.InUse.Set(float64(dbStats.InUse))
+		p.DBStats.Idle.Set(float64(dbStats.Idle))
+		p.DBStats.WaitCount.Set(float64(dbStats.WaitCount))
+		p.DBStats.WaitDuration.Set(float64(dbStats.WaitDuration))
+		p.DBStats.MaxIdleClosed.Set(float64(dbStats.MaxIdleClosed))
+		p.DBStats.MaxLifetimeClosed.Set(float64(dbStats.MaxLifetimeClosed))
+	} else {
+		p.DB.Logger.Error(context.Background(), "gorm:prometheus failed to collect db status, got error: %v", err)
+	}
 }
 
-func httpServer() {
-	var port uint32
-	if option.HttpServerPort != 0 {
-		port = option.HttpServerPort
-	} else {
-		port = DefaultHttpServerPort
+func (p *Prometheus) startServer() {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
+	if err != nil {
+		p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
 	}
-
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-		if err != nil {
-			fmt.Println("gorm plugin prometheus listen and serve err: ", err)
-		}
-	}()
 }
