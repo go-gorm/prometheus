@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	_    gorm.Plugin = &Prometheus{}
-	once sync.Once
+	_              gorm.Plugin = &Prometheus{}
+	httpServerOnce sync.Once
 )
 
 const (
@@ -149,7 +149,7 @@ func (p *Prometheus) refresh() {
 }
 
 func (p *Prometheus) startServer() {
-	once.Do(func() { //only start once
+	httpServerOnce.Do(func() { //only start once
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
