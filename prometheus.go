@@ -31,7 +31,7 @@ type Prometheus struct {
 }
 
 type Config struct {
-	DBName          string
+	DBName          string // add db name to prefix
 	StartServer     bool   // if true, create http server to expose metrics
 	HTTPServerPort  uint32 // http server port
 	RefreshInterval uint32 // refresh metrics interval.
