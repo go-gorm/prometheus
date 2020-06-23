@@ -13,7 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-var _ gorm.Plugin = &Prometheus{}
+var (
+	_    gorm.Plugin = &Prometheus{}
+	once sync.Once
+)
 
 const (
 	defaultRefreshInterval = 15   //the prometheus default pull metrics every 15 seconds
@@ -28,6 +31,7 @@ type Prometheus struct {
 }
 
 type Config struct {
+	DBName          string
 	StartServer     bool   // if true, create http server to expose metrics
 	HTTPServerPort  uint32 // http server port
 	RefreshInterval uint32 // refresh metrics interval.
@@ -67,37 +71,41 @@ func (p *Prometheus) Name() string {
 func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 	p.DB = db
 
+	dbStatsPrefix := "gorm_dbstats_"
+	if p.Config.DBName != "" {
+		dbStatsPrefix = fmt.Sprintf("%s%s_", dbStatsPrefix, p.Config.DBName)
+	}
 	p.DBStats = &DBStats{
 		MaxOpenConnections: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "max_open_connections",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "max_open_connections"),
 			Help: "Maximum number of open connections to the database.",
 		}),
 		OpenConnections: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "open_connections",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "open_connections"),
 			Help: "The number of established connections both in use and idle.",
 		}),
 		InUse: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "in_use",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "in_use"),
 			Help: "The number of connections currently in use.",
 		}),
 		Idle: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "idle",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "idle"),
 			Help: "The number of idle connections.",
 		}),
 		WaitCount: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "wait_count",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "wait_count"),
 			Help: "The total number of connections waited for.",
 		}),
 		WaitDuration: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "wait_duration",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "wait_duration"),
 			Help: "The total time blocked waiting for a new connection.",
 		}),
 		MaxIdleClosed: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "max_idle_closed",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "max_idle_closed"),
 			Help: "The total number of connections closed due to SetMaxIdleConns.",
 		}),
 		MaxLifetimeClosed: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "max_lifetime_closed",
+			Name: fmt.Sprintf("%s%s", dbStatsPrefix, "max_lifetime_closed"),
 			Help: "The total number of connections closed due to SetConnMaxLifetime.",
 		}),
 	}
@@ -110,7 +118,9 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 
 	p.Once.Do(func() {
 		if p.Config.StartServer {
-			go p.startServer()
+			once.Do(func() {
+				go p.startServer() //only start once
+			})
 		}
 
 		go func() {
