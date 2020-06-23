@@ -3,13 +3,13 @@ package prometheus
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 )
 
@@ -118,9 +118,7 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 
 	p.Once.Do(func() {
 		if p.Config.StartServer {
-			once.Do(func() {
-				go p.startServer() //only start once
-			})
+			go p.startServer()
 		}
 
 		go func() {
@@ -151,10 +149,12 @@ func (p *Prometheus) refresh() {
 }
 
 func (p *Prometheus) startServer() {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
-	if err != nil {
-		p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
-	}
+	once.Do(func() { //only start once
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
+		if err != nil {
+			p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
+		}
+	})
 }
