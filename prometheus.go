@@ -102,7 +102,7 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 		}),
 	}
 
-	dbStatsValue := reflect.ValueOf(p.DBStats)
+	dbStatsValue := reflect.ValueOf(*p.DBStats)
 
 	for i := 0; i < dbStatsValue.NumField(); i++ {
 		_ = prometheus.Register(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
