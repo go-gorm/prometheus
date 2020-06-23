@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var _ gorm.Plugin = &Prometheus{}
+
 const (
 	defaultRefreshInterval = 15   //the prometheus default pull metrics every 15 seconds
 	defaultHTTPServerPort  = 9100 // prometheus default pull port
@@ -62,7 +64,7 @@ func (p *Prometheus) Name() string {
 	return "gorm:prometheus"
 }
 
-func (p *Prometheus) Initialize(db *gorm.DB) { //can be called repeatedly
+func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 	p.DB = db
 
 	p.DBStats = &DBStats{
@@ -117,6 +119,8 @@ func (p *Prometheus) Initialize(db *gorm.DB) { //can be called repeatedly
 			}
 		}()
 	})
+
+	return nil
 }
 
 func (p *Prometheus) refresh() {
