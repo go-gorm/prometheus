@@ -27,15 +27,15 @@ type Prometheus struct {
 	*gorm.DB
 	*DBStats
 	*Config
-	httpServerOnce, once, pushOnce sync.Once
+	refreshOnce, pushOnce sync.Once
 }
 
 type Config struct {
 	DBName          string // use DBName as metrics label
-	StartServer     bool   // if true, create http server to expose metrics
-	HTTPServerPort  uint32 // http server port
 	RefreshInterval uint32 // refresh metrics interval.
 	PushAddr        string // prometheus pusher address
+	StartServer     bool   // if true, create http server to expose metrics
+	HTTPServerPort  uint32 // http server port
 }
 
 type DBStats struct {
@@ -125,7 +125,7 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 		_ = prometheus.Register(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
 	}
 
-	p.once.Do(func() {
+	p.refreshOnce.Do(func() {
 		go func() {
 			for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
 				p.refresh()
@@ -161,17 +161,6 @@ func (p *Prometheus) refresh() {
 	}
 }
 
-func (p *Prometheus) startServer() {
-	p.httpServerOnce.Do(func() { //only start once
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
-		if err != nil {
-			p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
-		}
-	})
-}
-
 func (p *Prometheus) startPush() {
 	p.pushOnce.Do(func() {
 		pusher := push.New(p.PushAddr, "gorm")
@@ -186,6 +175,19 @@ func (p *Prometheus) startPush() {
 			if err != nil {
 				p.DB.Logger.Error(context.Background(), "gorm:prometheus push err: ", err)
 			}
+		}
+	})
+}
+
+var httpServerOnce sync.Once
+
+func (p *Prometheus) startServer() {
+	httpServerOnce.Do(func() { //only start once
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
+		if err != nil {
+			p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
 		}
 	})
 }
