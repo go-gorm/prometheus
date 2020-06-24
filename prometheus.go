@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"net/http"
 	"reflect"
 	"sync"
@@ -19,8 +20,8 @@ var (
 )
 
 const (
-	defaultRefreshInterval = 15   //the prometheus default pull metrics every 15 seconds
-	defaultHTTPServerPort  = 9100 // prometheus default pull port
+	defaultRefreshInterval = 15   // the prometheus default pull metrics every 15 seconds
+	defaultHTTPServerPort  = 8080 // default pull port
 )
 
 type Prometheus struct {
@@ -35,6 +36,7 @@ type Config struct {
 	StartServer     bool   // if true, create http server to expose metrics
 	HTTPServerPort  uint32 // http server port
 	RefreshInterval uint32 // refresh metrics interval.
+	PushAddr        string
 }
 
 type DBStats struct {
@@ -136,6 +138,10 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 		}()
 	})
 
+	if p.PushAddr != "" {
+		go p.startPush()
+	}
+
 	return nil
 }
 
@@ -165,4 +171,20 @@ func (p *Prometheus) startServer() {
 			p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
 		}
 	})
+}
+
+func (p *Prometheus) startPush() {
+	pusher := push.New(p.PushAddr, p.DBName)
+
+	dbStatsValue := reflect.ValueOf(*p.DBStats)
+	for i := 0; i < dbStatsValue.NumField(); i++ {
+		pusher = pusher.Collector(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
+	}
+
+	for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
+		err := pusher.Push()
+		if err != nil {
+			p.DB.Logger.Error(context.Background(), "gorm:prometheus push err: ", err)
+		}
+	}
 }
