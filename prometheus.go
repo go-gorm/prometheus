@@ -17,6 +17,7 @@ import (
 var (
 	_              gorm.Plugin = &Prometheus{}
 	httpServerOnce sync.Once
+	pushOnce       sync.Once
 )
 
 const (
@@ -174,17 +175,19 @@ func (p *Prometheus) startServer() {
 }
 
 func (p *Prometheus) startPush() {
-	pusher := push.New(p.PushAddr, p.DBName)
+	pushOnce.Do(func() {
+		pusher := push.New(p.PushAddr, "gorm")
 
-	dbStatsValue := reflect.ValueOf(*p.DBStats)
-	for i := 0; i < dbStatsValue.NumField(); i++ {
-		pusher = pusher.Collector(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
-	}
-
-	for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
-		err := pusher.Push()
-		if err != nil {
-			p.DB.Logger.Error(context.Background(), "gorm:prometheus push err: ", err)
+		dbStatsValue := reflect.ValueOf(*p.DBStats)
+		for i := 0; i < dbStatsValue.NumField(); i++ {
+			pusher = pusher.Collector(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
 		}
-	}
+
+		for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
+			err := pusher.Push()
+			if err != nil {
+				p.DB.Logger.Error(context.Background(), "gorm:prometheus push err: ", err)
+			}
+		}
+	})
 }
