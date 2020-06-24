@@ -46,10 +46,10 @@ type DBStats struct {
 	Idle            prometheus.Gauge // The number of idle connections.
 
 	// Counters
-	WaitCount         prometheus.Gauge // The total number of connections waited for.
-	WaitDuration      prometheus.Gauge // The total time blocked waiting for a new connection.
-	MaxIdleClosed     prometheus.Gauge // The total number of connections closed due to SetMaxIdleConns.
-	MaxLifetimeClosed prometheus.Gauge // The total number of connections closed due to SetConnMaxLifetime.
+	WaitCount         prometheus.Counter // The total number of connections waited for.
+	WaitDuration      prometheus.Counter // The total time blocked waiting for a new connection.
+	MaxIdleClosed     prometheus.Counter // The total number of connections closed due to SetMaxIdleConns.
+	MaxLifetimeClosed prometheus.Counter // The total number of connections closed due to SetConnMaxLifetime.
 }
 
 func New(config Config) *Prometheus {
@@ -96,22 +96,22 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 			Help:        "The number of idle connections.",
 			ConstLabels: labels,
 		}),
-		WaitCount: prometheus.NewGauge(prometheus.GaugeOpts{
+		WaitCount: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:        "gorm_dbstats_wait_count",
 			Help:        "The total number of connections waited for.",
 			ConstLabels: labels,
 		}),
-		WaitDuration: prometheus.NewGauge(prometheus.GaugeOpts{
+		WaitDuration: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:        "gorm_dbstats_wait_duration",
 			Help:        "The total time blocked waiting for a new connection.",
 			ConstLabels: labels,
 		}),
-		MaxIdleClosed: prometheus.NewGauge(prometheus.GaugeOpts{
+		MaxIdleClosed: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:        "gorm_dbstats_max_idle_closed",
 			Help:        "The total number of connections closed due to SetMaxIdleConns.",
 			ConstLabels: labels,
 		}),
-		MaxLifetimeClosed: prometheus.NewGauge(prometheus.GaugeOpts{
+		MaxLifetimeClosed: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:        "gorm_dbstats_max_lifetime_closed",
 			Help:        "The total number of connections closed due to SetConnMaxLifetime.",
 			ConstLabels: labels,
