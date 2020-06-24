@@ -14,8 +14,10 @@ import (
 db, err := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
 
 db.Use(prometheus.New(prometheus.Config{
-  StartServer:     true, // start http server to expose metrics
-  HTTPServerPort:  8080, // http server port
-  RefreshInterval: 15,   // refresh metrics interval (seconds)
+  DBName:          "db1", // use `DBName` as metrics label
+  RefreshInterval: 15,    // refresh metrics interval (seconds)
+  StartServer:     true,  // start http server to expose metrics
+  HTTPServerPort:  8080,  // http server port
+  PushAddr:        "prometheus pusher address", // push metrics if `PushAddr` configured
 }))
 ```

@@ -3,21 +3,19 @@ package prometheus
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"net/http"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"gorm.io/gorm"
 )
 
 var (
-	_              gorm.Plugin = &Prometheus{}
-	httpServerOnce sync.Once
-	pushOnce       sync.Once
+	_ gorm.Plugin = &Prometheus{}
 )
 
 const (
@@ -29,15 +27,15 @@ type Prometheus struct {
 	*gorm.DB
 	*DBStats
 	*Config
-	sync.Once
+	httpServerOnce, once, pushOnce sync.Once
 }
 
 type Config struct {
-	DBName          string // add db name to prefix
+	DBName          string // use DBName as metrics label
 	StartServer     bool   // if true, create http server to expose metrics
 	HTTPServerPort  uint32 // http server port
 	RefreshInterval uint32 // refresh metrics interval.
-	PushAddr        string
+	PushAddr        string // prometheus pusher address
 }
 
 type DBStats struct {
@@ -127,17 +125,17 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 		_ = prometheus.Register(dbStatsValue.Field(i).Interface().(prometheus.Gauge))
 	}
 
-	p.Once.Do(func() {
-		if p.Config.StartServer {
-			go p.startServer()
-		}
-
+	p.once.Do(func() {
 		go func() {
 			for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
 				p.refresh()
 			}
 		}()
 	})
+
+	if p.Config.StartServer {
+		go p.startServer()
+	}
 
 	if p.PushAddr != "" {
 		go p.startPush()
@@ -164,7 +162,7 @@ func (p *Prometheus) refresh() {
 }
 
 func (p *Prometheus) startServer() {
-	httpServerOnce.Do(func() { //only start once
+	p.httpServerOnce.Do(func() { //only start once
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
@@ -175,7 +173,7 @@ func (p *Prometheus) startServer() {
 }
 
 func (p *Prometheus) startPush() {
-	pushOnce.Do(func() {
+	p.pushOnce.Do(func() {
 		pusher := push.New(p.PushAddr, "gorm")
 
 		dbStatsValue := reflect.ValueOf(*p.DBStats)
