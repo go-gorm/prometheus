@@ -8,6 +8,8 @@ import (
 	"strconv"
 )
 
+const statusPrefix = "gorm_status_"
+
 type Mysql struct {
 	StatusVariableName []string
 	status             map[string]prometheus.Gauge
@@ -17,7 +19,7 @@ func (m *Mysql) Initialize(label map[string]string) {
 	m.status = make(map[string]prometheus.Gauge)
 	for _, v := range m.StatusVariableName {
 		m.status[v] = prometheus.NewGauge(prometheus.GaugeOpts{
-			Name:        v,
+			Name:        statusPrefix + v,
 			ConstLabels: label,
 		})
 	}
