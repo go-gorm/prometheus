@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"gorm.io/gorm"
@@ -22,6 +21,12 @@ const (
 	defaultHTTPServerPort  = 8080 // default pull port
 )
 
+type MetricsCollector interface {
+	Initialize(map[string]string)
+	Set(db *gorm.DB)
+	Collector(pusher *push.Pusher) *push.Pusher
+}
+
 type Prometheus struct {
 	*gorm.DB
 	*DBStats
@@ -30,11 +35,12 @@ type Prometheus struct {
 }
 
 type Config struct {
-	DBName          string // use DBName as metrics label
-	RefreshInterval uint32 // refresh metrics interval.
-	PushAddr        string // prometheus pusher address
-	StartServer     bool   // if true, create http server to expose metrics
-	HTTPServerPort  uint32 // http server port
+	DBName           string             // use DBName as metrics label
+	RefreshInterval  uint32             // refresh metrics interval.
+	PushAddr         string             // prometheus pusher address
+	StartServer      bool               // if true, create http server to expose metrics
+	HTTPServerPort   uint32             // http server port
+	MetricsCollector []MetricsCollector // collector
 }
 
 func New(config Config) *Prometheus {
@@ -62,8 +68,9 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 	}
 
 	p.DBStats = newStats(labels)
-	for _, collector := range p.DBStats.Collectors() {
-		_ = prometheus.Register(collector)
+
+	for _, c := range p.Config.MetricsCollector {
+		c.Initialize(labels)
 	}
 
 	p.refreshOnce.Do(func() {
@@ -91,6 +98,10 @@ func (p *Prometheus) refresh() {
 	} else {
 		p.DB.Logger.Error(context.Background(), "gorm:prometheus failed to collect db status, got error: %v", err)
 	}
+
+	for _, c := range p.MetricsCollector {
+		c.Set(p.DB)
+	}
 }
 
 func (p *Prometheus) startPush() {
@@ -99,6 +110,10 @@ func (p *Prometheus) startPush() {
 
 		for _, collector := range p.DBStats.Collectors() {
 			pusher = pusher.Collector(collector)
+		}
+
+		for _, c := range p.MetricsCollector {
+			pusher = c.Collector(pusher)
 		}
 
 		for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {

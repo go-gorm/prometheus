@@ -19,5 +19,8 @@ db.Use(prometheus.New(prometheus.Config{
   PushAddr:        "prometheus pusher address", // push metrics if `PushAddr` configured
   StartServer:     true,  // start http server to expose metrics
   HTTPServerPort:  8080,  // configure http server port, default port 8080 (if you have configured multiple instances, only the first `HTTPServerPort` will be used to start server)
+  MetricsCollector: []prometheus.MetricsCollector {
+ 	&prometheus.Mysql{StatusVariableName: []string{"Threads_running"}},
+ },
 }))
 ```

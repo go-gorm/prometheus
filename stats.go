@@ -9,7 +9,7 @@ import (
 type DBStats struct {
 	MaxOpenConnections prometheus.Gauge // Maximum number of open connections to the database.
 
-	// Pool Status
+	// Pool status
 	OpenConnections prometheus.Gauge // The number of established connections both in use and idle.
 	InUse           prometheus.Gauge // The number of connections currently in use.
 	Idle            prometheus.Gauge // The number of idle connections.
@@ -22,7 +22,7 @@ type DBStats struct {
 }
 
 func newStats(labels map[string]string) *DBStats {
-	return &DBStats{
+	stats := &DBStats{
 		MaxOpenConnections: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:        "gorm_dbstats_max_open_connections",
 			Help:        "Maximum number of open connections to the database.",
@@ -64,6 +64,12 @@ func newStats(labels map[string]string) *DBStats {
 			ConstLabels: labels,
 		}),
 	}
+
+	for _, collector := range stats.Collectors() {
+		_ = prometheus.Register(collector)
+	}
+
+	return stats
 }
 
 func (stats *DBStats) Set(dbStats sql.DBStats) {
