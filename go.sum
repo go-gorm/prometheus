@@ -106,3 +106,5 @@ gopkg.in/yaml.v2 v2.2.4/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.5/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gorm.io/gorm v0.2.14 h1:33M9Ihj0S45EWGdJePrSir4GAu5hD/R6YabqFIsykgo=
 gorm.io/gorm v0.2.14/go.mod h1:0HFTzE/SqkGTzK6TlDPPQbAYCluiVvhzoA1+aVyzenw=
+gorm.io/gorm v0.2.38 h1:zHrkh0Xckf78itpEmA4MdjgU9HcelE3gG5FeEb+MQYM=
+gorm.io/gorm v0.2.38/go.mod h1:0HFTzE/SqkGTzK6TlDPPQbAYCluiVvhzoA1+aVyzenw=
