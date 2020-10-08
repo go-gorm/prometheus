@@ -49,6 +49,7 @@ func (m *MySQL) collect(p *Prometheus) {
 
 	if err != nil {
 		p.DB.Logger.Error(context.Background(), "gorm:prometheus query error: %v", err)
+		return
 	}
 
 	var variableName, variableValue string
