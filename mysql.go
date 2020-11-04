@@ -72,7 +72,7 @@ func (m *MySQL) collect(p *Prometheus) {
 		if found {
 			value, err := strconv.ParseFloat(variableValue, 64)
 			if err != nil {
-				p.DB.Logger.Error(context.Background(), "gorm:prometheus parse float got error: %v", err)
+				p.DB.Logger.Warn(context.Background(), "grom:prometheus parser float name: %s / value: %s is not metrics. err: %v skipped.", variableName, variableValue, err)
 				continue
 			}
 
