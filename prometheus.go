@@ -39,6 +39,8 @@ type Config struct {
 	DBName           string             // use DBName as metrics label
 	RefreshInterval  uint32             // refresh metrics interval.
 	PushAddr         string             // prometheus pusher address
+	PushUser         string             // prometheus pusher basic auth user
+	PushPassword     string             // prometheus pusher basic auth password
 	StartServer      bool               // if true, create http server to expose metrics
 	HTTPServerPort   uint32             // http server port
 	MetricsCollector []MetricsCollector // collector
@@ -103,6 +105,10 @@ func (p *Prometheus) refresh() {
 func (p *Prometheus) startPush() {
 	p.pushOnce.Do(func() {
 		pusher := push.New(p.PushAddr, p.DBName)
+
+		if p.PushUser != "" || p.PushPassword != "" {
+			pusher.BasicAuth(p.PushUser, p.PushPassword)
+		}
 
 		for _, collector := range p.DBStats.Collectors() {
 			pusher = pusher.Collector(collector)
