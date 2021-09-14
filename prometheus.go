@@ -84,11 +84,15 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 	})
 
 	if p.Config.StartServer {
-		go p.startServer()
+		httpServerOnce.Do(func() { //only start once
+			go p.startServer()
+		})
 	}
 
 	if p.PushAddr != "" {
-		go p.startPush()
+		p.pushOnce.Do(func() {
+			go p.startPush()
+		})
 	}
 
 	return nil
@@ -103,39 +107,35 @@ func (p *Prometheus) refresh() {
 }
 
 func (p *Prometheus) startPush() {
-	p.pushOnce.Do(func() {
-		pusher := push.New(p.PushAddr, p.DBName)
+	pusher := push.New(p.PushAddr, p.DBName)
 
-		if p.PushUser != "" || p.PushPassword != "" {
-			pusher.BasicAuth(p.PushUser, p.PushPassword)
-		}
+	if p.PushUser != "" || p.PushPassword != "" {
+		pusher.BasicAuth(p.PushUser, p.PushPassword)
+	}
 
-		for _, collector := range p.DBStats.Collectors() {
-			pusher = pusher.Collector(collector)
-		}
+	for _, collector := range p.DBStats.Collectors() {
+		pusher = pusher.Collector(collector)
+	}
 
-		for _, c := range p.collectors {
-			pusher = pusher.Collector(c)
-		}
+	for _, c := range p.collectors {
+		pusher = pusher.Collector(c)
+	}
 
-		for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
-			err := pusher.Push()
-			if err != nil {
-				p.DB.Logger.Error(context.Background(), "gorm:prometheus push err: ", err)
-			}
+	for range time.Tick(time.Duration(p.Config.RefreshInterval) * time.Second) {
+		err := pusher.Push()
+		if err != nil {
+			p.DB.Logger.Error(context.Background(), "gorm:prometheus push err: ", err)
 		}
-	})
+	}
 }
 
 var httpServerOnce sync.Once
 
 func (p *Prometheus) startServer() {
-	httpServerOnce.Do(func() { //only start once
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
-		if err != nil {
-			p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
-		}
-	})
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	err := http.ListenAndServe(fmt.Sprintf(":%d", p.Config.HTTPServerPort), mux)
+	if err != nil {
+		p.DB.Logger.Error(context.Background(), "gorm:prometheus listen and serve err: ", err)
+	}
 }
