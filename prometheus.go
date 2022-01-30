@@ -32,7 +32,7 @@ type Prometheus struct {
 	*Config
 	refreshOnce, pushOnce sync.Once
 	Labels                map[string]string
-	collectors            []prometheus.Collector
+	Collectors            []prometheus.Collector
 }
 
 type Config struct {
@@ -73,7 +73,7 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 
 	p.refreshOnce.Do(func() {
 		for _, mc := range p.MetricsCollector {
-			p.collectors = append(p.collectors, mc.Metrics(p)...)
+			p.Collectors = append(p.Collectors, mc.Metrics(p)...)
 		}
 
 		go func() {
@@ -117,7 +117,7 @@ func (p *Prometheus) startPush() {
 		pusher = pusher.Collector(collector)
 	}
 
-	for _, c := range p.collectors {
+	for _, c := range p.Collectors {
 		pusher = pusher.Collector(c)
 	}
 
