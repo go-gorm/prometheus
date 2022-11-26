@@ -19,6 +19,7 @@ type DBStats struct {
 	WaitDuration      prometheus.Gauge // The total time blocked waiting for a new connection.
 	MaxIdleClosed     prometheus.Gauge // The total number of connections closed due to SetMaxIdleConns.
 	MaxLifetimeClosed prometheus.Gauge // The total number of connections closed due to SetConnMaxLifetime.
+	MaxIdleTimeClosed prometheus.Gauge // The total number of connections closed due to SetConnMaxIdleTime.
 }
 
 func newStats(labels map[string]string) *DBStats {
@@ -63,6 +64,11 @@ func newStats(labels map[string]string) *DBStats {
 			Help:        "The total number of connections closed due to SetConnMaxLifetime.",
 			ConstLabels: labels,
 		}),
+		MaxIdleTimeClosed: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name:        "gorm_dbstats_max_idletime_closed",
+			Help:        "The total number of connections closed due to SetConnMaxIdleTime.",
+			ConstLabels: labels,
+		}),
 	}
 
 	for _, collector := range stats.Collectors() {
@@ -81,6 +87,7 @@ func (stats *DBStats) Set(dbStats sql.DBStats) {
 	stats.WaitDuration.Set(float64(dbStats.WaitDuration))
 	stats.MaxIdleClosed.Set(float64(dbStats.MaxIdleClosed))
 	stats.MaxLifetimeClosed.Set(float64(dbStats.MaxLifetimeClosed))
+	stats.MaxIdleTimeClosed.Set(float64(dbStats.MaxIdleTimeClosed))
 }
 
 //get collector in stats
