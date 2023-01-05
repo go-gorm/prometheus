@@ -115,6 +115,8 @@ func (m *Postgres) Metrics(p *Prometheus) []prometheus.Collector {
 }
 
 func (m *Postgres) replicationLag(p *Prometheus, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	metric := "lag"
 
 	rows, err := p.DB.Raw("SELECT CASE WHEN NOT pg_is_in_recovery() THEN 0 ELSE GREATEST (0, EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) END AS lag").Rows()
@@ -151,10 +153,11 @@ func (m *Postgres) replicationLag(p *Prometheus, wg *sync.WaitGroup) {
 		}
 		gauge.Set(value)
 	}
-	wg.Done()
 }
 
 func (m *Postgres) postMasterStart(p *Prometheus, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	metric := "start_time_seconds"
 	rows, err := p.DB.Raw("SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()").Rows()
 
@@ -191,10 +194,11 @@ func (m *Postgres) postMasterStart(p *Prometheus, wg *sync.WaitGroup) {
 
 		gauge.Set(float64(value.Unix()))
 	}
-	wg.Done()
 }
 
 func (m *Postgres) size(p *Prometheus, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	type data struct {
 		DatName   string `gorm:"column:datname" type:"label" help:"Name of current database"`
 		SizeBytes int64  `gorm:"column:size_bytes" type:"gauge" help:"Size of database in bytes"`
@@ -220,10 +224,11 @@ func (m *Postgres) size(p *Prometheus, wg *sync.WaitGroup) {
 
 		m._parse(t, v, p)
 	}
-	wg.Done()
 }
 
 func (m *Postgres) pgStatUserTables(p *Prometheus, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	type data struct {
 		DatName              string    `gorm:"column:datname" type:"label" help:"Name of current database"`
 		SchemaName           string    `gorm:"column:schemaname" type:"label" help:"Name of the schema that this table is in"`
@@ -294,10 +299,11 @@ func (m *Postgres) pgStatUserTables(p *Prometheus, wg *sync.WaitGroup) {
 
 		m._parse(t, v, p)
 	}
-	wg.Done()
 }
 
 func (m *Postgres) pgStatIOUserTables(p *Prometheus, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	type data struct {
 		DatName       string `gorm:"column:datname" type:"label" help:"Name of current database"`
 		SchemaName    string `gorm:"column:schemaname" type:"label" help:"Name of the schema that this table is in"`
@@ -345,10 +351,11 @@ func (m *Postgres) pgStatIOUserTables(p *Prometheus, wg *sync.WaitGroup) {
 
 		m._parse(t, v, p)
 	}
-	wg.Done()
 }
 
 func (m *Postgres) recordCount(p *Prometheus, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	type data struct {
 		DatName    string `gorm:"column:table_schema" type:"label" help:"Name of current database"`
 		SchemaName string `gorm:"column:table_name" type:"label" help:"Name of the schema that this table is in"`
@@ -375,7 +382,6 @@ func (m *Postgres) recordCount(p *Prometheus, wg *sync.WaitGroup) {
 
 		m._parse(t, v, p)
 	}
-	wg.Done()
 }
 
 // _parse parses the data per database ROW and registers it for sending
