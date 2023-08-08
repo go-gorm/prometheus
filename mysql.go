@@ -72,8 +72,23 @@ func (m *MySQL) collect(p *Prometheus) {
 
 		if found {
 			// 校验variableValue是否为字符串
-			if variableValue == "" || !unicode.IsNumber(rune(variableValue[0])) {
-				// 字符串直接 return
+			if variableValue == "" {
+				continue
+			}
+
+			isFloat64 := true
+			for _, r := range variableValue {
+				if !unicode.IsNumber(r) {
+					// 非数字、字母、. 直接 return
+					isFloat64 = false
+					break
+				}
+				if r == ':' {
+					isFloat64 = false
+					break
+				}
+			}
+			if !isFloat64 {
 				continue
 			}
 
