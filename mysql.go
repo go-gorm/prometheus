@@ -71,7 +71,7 @@ func (m *MySQL) collect(p *Prometheus) {
 		}
 
 		if found {
-			// 校验variableValue是否为字符串
+			// check if variableValue is string
 			if variableValue == "" {
 				continue
 			}
