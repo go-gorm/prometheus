@@ -44,6 +44,7 @@ type Config struct {
 	StartServer      bool               // if true, create http server to expose metrics
 	HTTPServerPort   uint32             // http server port
 	MetricsCollector []MetricsCollector // collector
+	Labels           map[string]string  // metrics labels
 }
 
 func New(config Config) *Prometheus {
@@ -55,14 +56,19 @@ func New(config Config) *Prometheus {
 		config.HTTPServerPort = defaultHTTPServerPort
 	}
 
-	return &Prometheus{Config: &config, Labels: make(map[string]string)}
+	labels := make(map[string]string)
+	if config.Labels != nil {
+		labels = config.Labels
+	}
+
+	return &Prometheus{Config: &config, Labels: labels}
 }
 
 func (p *Prometheus) Name() string {
 	return "gorm:prometheus"
 }
 
-func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
+func (p *Prometheus) Initialize(db *gorm.DB) error { // can be called repeatedly
 	p.DB = db
 
 	if p.Config.DBName != "" {
@@ -84,7 +90,7 @@ func (p *Prometheus) Initialize(db *gorm.DB) error { //can be called repeatedly
 	})
 
 	if p.Config.StartServer {
-		httpServerOnce.Do(func() { //only start once
+		httpServerOnce.Do(func() { // only start once
 			go p.startServer()
 		})
 	}

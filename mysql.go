@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"time"
+	"unicode"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -70,6 +71,26 @@ func (m *MySQL) collect(p *Prometheus) {
 		}
 
 		if found {
+			// check if variableValue is string
+			if variableValue == "" {
+				continue
+			}
+
+			isFloat64 := true
+			for _, r := range variableValue {
+				if !unicode.IsNumber(r) {
+					isFloat64 = false
+					break
+				}
+				if r == ':' {
+					isFloat64 = false
+					break
+				}
+			}
+			if !isFloat64 {
+				continue
+			}
+
 			value, err := strconv.ParseFloat(variableValue, 64)
 			if err != nil {
 				p.DB.Logger.Error(context.Background(), "gorm:prometheus parse float got error: %v", err)
