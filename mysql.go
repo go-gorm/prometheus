@@ -79,7 +79,6 @@ func (m *MySQL) collect(p *Prometheus) {
 			isFloat64 := true
 			for _, r := range variableValue {
 				if !unicode.IsNumber(r) {
-					// 非数字、字母、. 直接 return
 					isFloat64 = false
 					break
 				}
