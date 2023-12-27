@@ -16,7 +16,7 @@ if err != nil {
     fmt.Errorf("error opening database: %v", err)
 }
 
-db.Use(New(prometheus.Config{
+db.Use(prometheus.New(prometheus.Config{
     DBName:          "db1",                       // `DBName` as metrics label
     RefreshInterval: 15,                          // refresh metrics interval (default 15 seconds)
     PushAddr:        "prometheus pusher address", // push metrics if `PushAddr` configured
