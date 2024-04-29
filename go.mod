@@ -4,5 +4,5 @@ go 1.14
 
 require (
 	github.com/prometheus/client_golang v1.19.0
-	gorm.io/gorm v1.25.0
+	gorm.io/gorm v1.25.10
 )
