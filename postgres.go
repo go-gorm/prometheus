@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Posgres metrics providers. Metrics is being contructed from Sturct labels:
+// Postgres metrics providers. Metrics are contructed from Struct labels:
 // Type translation:
 //					 int64 - Counter, Gauge
 // 					 time.Time - Gauge
